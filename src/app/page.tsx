@@ -233,7 +233,7 @@ export default function Home() {
       {status === "playing" && (
         <div className="flex flex-col items-center gap-4">
           <div className="text-center">
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-1">
+            <p className="text-sm text-zinc-600 dark:text-zinc-300 mb-1">
               시도 {attemptNum}/6 · 남은 후보 {remaining.toLocaleString()}개
             </p>
             <p className="text-4xl font-bold text-zinc-900 dark:text-white tracking-wide">
@@ -256,7 +256,7 @@ export default function Home() {
             ))}
           </div>
 
-          <p className="text-xs text-zinc-400 dark:text-zinc-500">
+          <p className="text-sm text-zinc-600 dark:text-zinc-300">
             클릭하거나 좌우 방향키로 이동 후 Space를 눌러 상태를 변경하세요
           </p>
 
