@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   loadWords,
   filterPossible,
@@ -97,7 +97,7 @@ export default function Home() {
     });
   }
 
-  async function handleSubmit() {
+  const handleSubmit = useCallback(async () => {
     if (!allWords) return;
 
     const currentAttempt: Attempt = {
@@ -115,7 +115,7 @@ export default function Home() {
       return;
     }
 
-    if (attemptNum >= 6) {
+    if (attempts.length + 1 >= 6) {
       setState((prev) => ({
         ...prev,
         attempts: [...prev.attempts, currentAttempt],
@@ -156,7 +156,7 @@ export default function Home() {
     }));
     setSelectedIndex(0);
     setLoading(false);
-  }
+  }, [allWords, suggestion, pattern, attempts]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -182,7 +182,16 @@ export default function Home() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [status, loading, allWords, attempts, suggestion, pattern, selectedIndex]);
+  }, [
+    status,
+    loading,
+    allWords,
+    attempts,
+    suggestion,
+    pattern,
+    selectedIndex,
+    handleSubmit,
+  ]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 flex flex-col items-center py-12 px-4">
