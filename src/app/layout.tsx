@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "카카오 워들 솔버",
-  description: "3Blue1Brown 정보이론 방식의 카카오 워들 솔버",
+  title: "카카오톡 단어 맞추기",
+  description: "정보 이론을 활용하여 최적의 전략을 제시합니다.",
 };
 
 export default function RootLayout({
