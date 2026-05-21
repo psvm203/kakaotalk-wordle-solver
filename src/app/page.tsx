@@ -244,7 +244,7 @@ export default function Home() {
           </div>
 
           <p className="text-xs text-zinc-400 dark:text-zinc-500">
-            각 자모를 클릭하거나 Space를 눌러 상태를 변경하세요
+            클릭하거나 좌우 방향키로 이동 후 Space를 눌러 상태를 변경하세요
           </p>
 
           {error && <p className="text-sm text-red-500">{error}</p>}
