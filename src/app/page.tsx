@@ -32,10 +32,12 @@ function tileColorClass(val: number) {
 function JamoTile({
   char,
   value,
+  selected,
   onClick,
 }: {
   char: string;
   value: number;
+  selected?: boolean;
   onClick?: () => void;
 }) {
   return (
@@ -46,6 +48,7 @@ function JamoTile({
       className={`w-14 h-14 flex items-center justify-center text-xl font-bold rounded select-none
         ${tileColorClass(value)}
         ${onClick ? "cursor-pointer hover:opacity-80 active:scale-95 transition-transform" : "cursor-default"}
+        ${selected ? "ring-3 ring-offset-2 ring-zinc-900 dark:ring-white" : ""}
       `}
     >
       {char}
@@ -69,6 +72,7 @@ export default function Home() {
   const [allWords, setAllWords] = useState<WordEntry[] | null>(null);
   const [state, setState] = useState(resetState);
   const [loading, setLoading] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   useEffect(() => {
     loadWords().then(setAllWords);
@@ -150,18 +154,29 @@ export default function Home() {
       candidates,
       pattern: [0, 0, 0, 0, 0],
     }));
+    setSelectedIndex(0);
     setLoading(false);
   }
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Enter" && status === "playing" && !loading && allWords) {
+      if (status !== "playing") return;
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setSelectedIndex((i) => (i + 4) % 5);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setSelectedIndex((i) => (i + 1) % 5);
+      } else if (e.key === " ") {
+        e.preventDefault();
+        cyclePattern(selectedIndex);
+      } else if (e.key === "Enter" && !loading && allWords) {
         handleSubmit();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [status, loading, allWords, attempts, suggestion, pattern]);
+  }, [status, loading, allWords, attempts, suggestion, pattern, selectedIndex]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 flex flex-col items-center py-12 px-4">
@@ -204,13 +219,17 @@ export default function Home() {
                 key={i}
                 char={j}
                 value={pattern[i]}
-                onClick={() => cyclePattern(i)}
+                selected={i === selectedIndex}
+                onClick={() => {
+                  setSelectedIndex(i);
+                  cyclePattern(i);
+                }}
               />
             ))}
           </div>
 
           <p className="text-xs text-zinc-400 dark:text-zinc-500">
-            각 자모를 탭하여 결과 색상을 선택하세요
+            각 자모를 클릭하거나 Space를 눌러 상태를 변경하세요
           </p>
 
           {error && <p className="text-sm text-red-500">{error}</p>}
