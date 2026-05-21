@@ -160,7 +160,13 @@ export default function Home() {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (status !== "playing") return;
+      if (status !== "playing") {
+        if (e.key === "Enter" && (status === "won" || status === "lost")) {
+          setState(resetState());
+          setSelectedIndex(0);
+        }
+        return;
+      }
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         setSelectedIndex((i) => (i + 4) % 5);
@@ -267,7 +273,7 @@ export default function Home() {
             onClick={() => setState(resetState())}
             className="px-6 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold rounded-full hover:bg-zinc-700 transition-colors"
           >
-            다시 시작
+            다시 시작 (Enter)
           </button>
         </div>
       )}
