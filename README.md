@@ -1,36 +1,35 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 카카오톡 단어 맞추기 솔버
 
-## Getting Started
+카카오톡 단어 맞추기 게임을 위한 최적 전략 제시 도구입니다.  
+3Blue1Brown의 정보이론 (엔트로피 최대화) 방식으로 매 시도마다 후보를 가장 많이 줄이는 단어를 추천합니다.
 
-First, run the development server:
+## 사용 방법
+
+1. 솔버가 추천하는 단어를 카카오톡 단어 맞추기에 입력합니다.
+2. 결과로 돌아와 각 자모 타일을 탭하여 색상을 설정합니다.
+   - **회색** — 해당 자모가 정답에 없음
+   - **노랑** — 해당 자모가 있지만 위치가 다름
+   - **초록** — 해당 자모가 정확한 위치에 있음
+3. **결과 제출**을 누르면 다음 최적 추천 단어가 나옵니다.
+
+## 기술 스택
+
+- [Next.js 16](https://nextjs.org) — App Router, Static Export
+- [Tailwind CSS v4](https://tailwindcss.com)
+- TypeScript
+
+## 로컬 실행
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`http://localhost:3000`에서 확인할 수 있습니다.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 알고리즘
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+단어 목록은 [국립국어원 한국어 학습용 어휘 목록](https://www.korean.go.kr/front/etcData/etcDataView.do?mn_id=46&etc_seq=70&pageIndex=1) 에서 추출 및 가공한 1,102개 단어 + `카톡` 1개 단어로 이루어져 있습니다.  
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+첫 번째 추천 단어는 전체 단어 목록(1,103개)에 대해 엔트로피를 사전 계산한 최적값 `가위`로 고정되어 있습니다.  
+두 번째 시도부터는 현재 후보 단어들에 대해 엔트로피를 계산하고, 가장 많은 정보를 제공하는 단어를 추천합니다.
