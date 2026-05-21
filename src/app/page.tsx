@@ -153,6 +153,16 @@ export default function Home() {
     setLoading(false);
   }
 
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Enter" && status === "playing" && !loading && allWords) {
+        handleSubmit();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [status, loading, allWords, attempts, suggestion, pattern]);
+
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 flex flex-col items-center py-12 px-4">
       <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-1">
@@ -210,7 +220,11 @@ export default function Home() {
             disabled={loading || !allWords}
             className="mt-1 px-8 py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold rounded-full disabled:opacity-50 hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors"
           >
-            {loading ? "계산 중..." : !allWords ? "로딩 중..." : "결과 제출"}
+            {loading
+              ? "계산 중..."
+              : !allWords
+                ? "로딩 중..."
+                : "결과 제출 (Enter)"}
           </button>
 
           {candidates && (
