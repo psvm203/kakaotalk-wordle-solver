@@ -81,6 +81,57 @@ export function bestGuess(
   return best!;
 }
 
+const chosung = [
+  "ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ",
+  "ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ",
+];
+const jungsung = [
+  "ㅏ","ㅐ","ㅑ","ㅒ","ㅓ","ㅔ","ㅕ","ㅖ",
+  "ㅗ","ㅘ","ㅙ","ㅚ","ㅛ","ㅜ","ㅝ","ㅞ","ㅟ",
+  "ㅠ","ㅡ","ㅢ","ㅣ",
+];
+const jongsung = [
+  "","ㄱ","ㄲ","ㄳ","ㄴ","ㄵ","ㄶ","ㄷ",
+  "ㄹ","ㄺ","ㄻ","ㄼ","ㄽ","ㄾ","ㄿ","ㅀ",
+  "ㅁ","ㅂ","ㅄ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ",
+  "ㅋ","ㅌ","ㅍ","ㅎ",
+];
+
+const doubleInitial: Record<string, string> = { "ㄲ": "ㄱㄱ", "ㄸ": "ㄷㄷ", "ㅃ": "ㅂㅂ", "ㅆ": "ㅅㅅ", "ㅉ": "ㅈㅈ" };
+const compoundVowel: Record<string, string> = {
+  "ㅐ": "ㅏㅣ", "ㅒ": "ㅑㅣ", "ㅔ": "ㅓㅣ", "ㅖ": "ㅕㅣ",
+  "ㅘ": "ㅗㅏ", "ㅙ": "ㅗㅏㅣ", "ㅚ": "ㅗㅣ",
+  "ㅝ": "ㅜㅓ", "ㅞ": "ㅜㅓㅣ", "ㅟ": "ㅜㅣ", "ㅢ": "ㅡㅣ",
+};
+const doubleFinal: Record<string, string> = {
+  "ㄲ": "ㄱㄱ", "ㄳ": "ㄱㅅ", "ㄵ": "ㄴㅈ", "ㄶ": "ㄴㅎ",
+  "ㄺ": "ㄹㄱ", "ㄻ": "ㄹㅁ", "ㄼ": "ㄹㅂ", "ㄽ": "ㄹㅅ",
+  "ㄾ": "ㄹㅌ", "ㄿ": "ㄹㅍ", "ㅀ": "ㄹㅎ",
+  "ㅄ": "ㅂㅅ", "ㅆ": "ㅅㅅ",
+};
+
+export function decomposeWord(word: string): string[] {
+  const result: string[] = [];
+  for (const c of word) {
+    const code = c.charCodeAt(0) - 0xac00;
+    if (code < 0 || code > 11171) {
+      result.push(c);
+      continue;
+    }
+    const cho = (code / 588) | 0;
+    const jung = ((code % 588) / 28) | 0;
+    const jong = code % 28;
+    const choJamo = doubleInitial[chosung[cho]] ?? chosung[cho];
+    const jungJamo = compoundVowel[jungsung[jung]] ?? jungsung[jung];
+    result.push(...choJamo.split(""), ...jungJamo.split(""));
+    if (jong > 0) {
+      const jongJamo = doubleFinal[jongsung[jong]] ?? jongsung[jong];
+      result.push(...jongJamo.split(""));
+    }
+  }
+  return result;
+}
+
 export function filterPossible(
   possible: WordEntry[],
   guessJamo: Jamo,

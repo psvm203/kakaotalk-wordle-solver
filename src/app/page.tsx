@@ -5,6 +5,7 @@ import {
   loadWords,
   filterPossible,
   bestGuess,
+  decomposeWord,
   type WordEntry,
 } from "@/lib/solver";
 
@@ -66,9 +67,11 @@ function resetState() {
 
 export default function Home() {
   const [allWords, setAllWords] = useState<WordEntry[] | null>(null);
-  const [state, setState] = useState(resetState);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [inputWord, setInputWord] = useState("");
+  const [banned, setBanned] = useState<Set<string>>(new Set());
+  const [state, setState] = useState(resetState);
   const [lengthCounts, setLengthCounts] = useState<[number, number][] | null>(null);
 
   useEffect(() => {
@@ -93,6 +96,9 @@ export default function Home() {
     error,
   } = state;
   const attemptNum = attempts.length + 1;
+  const inputJamo = inputWord.trim() ? decomposeWord(inputWord.trim()) : suggestion.jamo;
+  const displayWord = inputWord.trim() || suggestion.word;
+  const displayJamo = inputWord.trim() ? inputJamo : suggestion.jamo;
 
   function cyclePattern(i: number) {
     setState((prev) => {
@@ -105,8 +111,9 @@ export default function Home() {
   function selectLength(len: number) {
     if (!allWords) return;
     const filtered = allWords.filter(([j]) => j.length === len);
-    if (filtered.length === 0) return;
-    const [bj, bw] = bestGuess(filtered, filtered);
+    const notBanned = filtered.filter(([, w]) => !banned.has(w));
+    if (notBanned.length === 0) return;
+    const [bj, bw] = bestGuess(notBanned, filtered);
     setState((prev) => ({
       ...prev,
       suggestion: { jamo: bj, word: bw },
@@ -119,12 +126,42 @@ export default function Home() {
     setSelectedIndex(0);
   }
 
+  function banWord(word: string) {
+    const next = new Set(banned);
+    if (next.has(word)) next.delete(word);
+    else next.add(word);
+    setBanned(next);
+  }
+
+  // recompute hint when banned words change
+  useEffect(() => {
+    if (!allWords || !length) return;
+    if (status !== "playing") return;
+    const possibleByLen = allWords.filter(([j]) => j.length === length);
+    let possible = possibleByLen;
+    for (const { jamo, pattern: p } of attempts) {
+      possible = filterPossible(possible, jamo, p);
+    }
+    if (possible.length === 0) return;
+    const searchPool = possibleByLen.filter(([, w]) => !banned.has(w));
+    if (searchPool.length === 0) return;
+    const [bj, bw] = bestGuess(searchPool, possible);
+    setState((prev) => ({
+      ...prev,
+      suggestion: { jamo: bj, word: bw },
+    }));
+  }, [banned, length, allWords, attempts, status]);
+
   const handleSubmit = useCallback(async () => {
     if (!allWords || !length) return;
+    if (displayJamo.length !== length) {
+      setState((prev) => ({ ...prev, error: `자소 길이가 ${length}자가 아닙니다 (입력: ${displayJamo.length}자)` }));
+      return;
+    }
 
     const currentAttempt: Attempt = {
-      jamo: suggestion.jamo,
-      word: suggestion.word,
+      jamo: displayJamo,
+      word: displayWord,
       pattern,
     };
 
@@ -155,6 +192,7 @@ export default function Home() {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     const possibleByLen = allWords.filter(([j]) => j.length === length);
+    const searchPool = possibleByLen.filter(([, w]) => !banned.has(w));
     let possible = possibleByLen;
     for (const { jamo, pattern: p } of newHistory) {
       possible = filterPossible(possible, jamo, p);
@@ -166,7 +204,7 @@ export default function Home() {
       return;
     }
 
-    const [nextJamo, nextWord] = bestGuess(possibleByLen, possible);
+    const [nextJamo, nextWord] = bestGuess(searchPool.length > 0 ? searchPool : possibleByLen, possible);
     const candidates = possible.length <= 6 ? possible.map(([, w]) => w) : null;
 
     setState((prev) => ({
@@ -179,7 +217,7 @@ export default function Home() {
     }));
     setSelectedIndex(0);
     setLoading(false);
-  }, [allWords, suggestion, pattern, attempts, length]);
+  }, [allWords, suggestion, pattern, attempts, length, displayJamo, displayWord, banned]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -201,7 +239,7 @@ export default function Home() {
       } else if (e.key === " ") {
         e.preventDefault();
         cyclePattern(selectedIndex);
-      } else if (e.key === "Enter" && !loading && allWords && length) {
+      } else if (e.key === "Enter" && !loading && allWords && length && status === "playing") {
         handleSubmit();
       }
     }
@@ -217,6 +255,7 @@ export default function Home() {
     selectedIndex,
     handleSubmit,
     length,
+    inputWord,
   ]);
 
   return (
@@ -293,17 +332,43 @@ export default function Home() {
                 <p className="text-sm text-zinc-600 dark:text-zinc-300 mb-1">
                   시도 {attemptNum}/6 · 남은 후보 {remaining.toLocaleString()}개
                 </p>
-                <p className="text-4xl font-bold text-zinc-900 dark:text-white tracking-wide">
-                  {suggestion.word}
-                </p>
+                <div className="flex items-center justify-center gap-3">
+                  <p className="text-4xl font-bold text-zinc-900 dark:text-white tracking-wide">
+                    {suggestion.word}
+                  </p>
+                  <button
+                    onClick={() => banWord(suggestion.word)}
+                    className={`px-2 py-1 text-xs font-semibold rounded-full transition-colors ${
+                      banned.has(suggestion.word)
+                        ? "bg-red-500 text-white"
+                        : "bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-300 hover:bg-red-200 dark:hover:bg-red-800"
+                    }`}
+                    title={banned.has(suggestion.word) ? "밴 해제" : "이 단어 밴"}
+                  >
+                    {banned.has(suggestion.word) ? "밴됨" : "밴"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={inputWord}
+                  onChange={(e) => setInputWord(e.target.value)}
+                  placeholder={suggestion.word}
+                  className="px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white text-center text-lg font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white w-32"
+                />
+                <span className="text-xs text-zinc-400">
+                  (빈칸=힌트 단어)
+                </span>
               </div>
 
               <div className="flex gap-2">
-                {suggestion.jamo.map((j, i) => (
+                {displayJamo.map((j, i) => (
                   <JamoTile
                     key={i}
                     char={j}
-                    value={pattern[i]}
+                    value={pattern[i] ?? 0}
                     selected={i === selectedIndex}
                     onClick={() => {
                       setSelectedIndex(i);
