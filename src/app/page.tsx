@@ -215,6 +215,7 @@ export default function Home() {
       candidates,
       pattern: Array(length).fill(0),
     }));
+    setInputWord("");
     setSelectedIndex(0);
     setLoading(false);
   }, [allWords, suggestion, pattern, attempts, length, displayJamo, displayWord, banned]);
