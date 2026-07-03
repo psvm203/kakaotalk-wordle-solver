@@ -8,12 +8,7 @@ import {
   type WordEntry,
 } from "@/lib/solver";
 
-const FIRST_GUESS = {
-  jamo: ["ㄱ", "ㅏ", "ㅇ", "ㅜ", "ㅣ"],
-  word: "가위",
-};
-
-const TOTAL_WORDS = 1103;
+const TOTAL_WORDS = 3786;
 
 type Attempt = {
   jamo: string[];
@@ -59,9 +54,10 @@ function JamoTile({
 function resetState() {
   return {
     attempts: [] as Attempt[],
-    suggestion: FIRST_GUESS,
-    pattern: [0, 0, 0, 0, 0],
-    remaining: TOTAL_WORDS,
+    suggestion: { jamo: [] as string[], word: "" },
+    pattern: [] as number[],
+    length: null as number | null,
+    remaining: 0,
     candidates: null as string[] | null,
     status: "playing" as GameStatus,
     error: null as string | null,
@@ -73,15 +69,24 @@ export default function Home() {
   const [state, setState] = useState(resetState);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [lengthCounts, setLengthCounts] = useState<[number, number][] | null>(null);
 
   useEffect(() => {
-    loadWords().then(setAllWords);
+    loadWords().then((words) => {
+      setAllWords(words);
+      const counts = new Map<number, number>();
+      for (const [jamo] of words) {
+        counts.set(jamo.length, (counts.get(jamo.length) ?? 0) + 1);
+      }
+      setLengthCounts([...counts.entries()].sort((a, b) => a[0] - b[0]));
+    });
   }, []);
 
   const {
     attempts,
     suggestion,
     pattern,
+    length,
     remaining,
     candidates,
     status,
@@ -97,8 +102,25 @@ export default function Home() {
     });
   }
 
-  const handleSubmit = useCallback(async () => {
+  function selectLength(len: number) {
     if (!allWords) return;
+    const filtered = allWords.filter(([j]) => j.length === len);
+    if (filtered.length === 0) return;
+    const [bj, bw] = bestGuess(filtered, filtered);
+    setState((prev) => ({
+      ...prev,
+      suggestion: { jamo: bj, word: bw },
+      pattern: Array(len).fill(0),
+      length: len,
+      remaining: filtered.length,
+      candidates: filtered.length <= 6 ? filtered.map(([, w]) => w) : null,
+      error: null,
+    }));
+    setSelectedIndex(0);
+  }
+
+  const handleSubmit = useCallback(async () => {
+    if (!allWords || !length) return;
 
     const currentAttempt: Attempt = {
       jamo: suggestion.jamo,
@@ -132,7 +154,8 @@ export default function Home() {
     // yield to React so "계산 중..." renders before computation blocks
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    let possible = allWords;
+    const possibleByLen = allWords.filter(([j]) => j.length === length);
+    let possible = possibleByLen;
     for (const { jamo, pattern: p } of newHistory) {
       possible = filterPossible(possible, jamo, p);
     }
@@ -143,7 +166,7 @@ export default function Home() {
       return;
     }
 
-    const [nextJamo, nextWord] = bestGuess(allWords, possible);
+    const [nextJamo, nextWord] = bestGuess(possibleByLen, possible);
     const candidates = possible.length <= 6 ? possible.map(([, w]) => w) : null;
 
     setState((prev) => ({
@@ -152,11 +175,11 @@ export default function Home() {
       suggestion: { jamo: nextJamo, word: nextWord },
       remaining: possible.length,
       candidates,
-      pattern: [0, 0, 0, 0, 0],
+      pattern: Array(length).fill(0),
     }));
     setSelectedIndex(0);
     setLoading(false);
-  }, [allWords, suggestion, pattern, attempts]);
+  }, [allWords, suggestion, pattern, attempts, length]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -167,16 +190,18 @@ export default function Home() {
         }
         return;
       }
+      const n = suggestion.jamo.length;
+      if (n === 0) return;
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        setSelectedIndex((i) => (i + 4) % 5);
+        setSelectedIndex((i) => (i + n - 1) % n);
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        setSelectedIndex((i) => (i + 1) % 5);
+        setSelectedIndex((i) => (i + 1) % n);
       } else if (e.key === " ") {
         e.preventDefault();
         cyclePattern(selectedIndex);
-      } else if (e.key === "Enter" && !loading && allWords) {
+      } else if (e.key === "Enter" && !loading && allWords && length) {
         handleSubmit();
       }
     }
@@ -191,6 +216,7 @@ export default function Home() {
     pattern,
     selectedIndex,
     handleSubmit,
+    length,
   ]);
 
   return (
@@ -212,107 +238,140 @@ export default function Home() {
         </a>
       </div>
 
-      {attempts.length > 0 && (
-        <div className="flex flex-col gap-2 mb-6">
-          {attempts.map((a, idx) => (
-            <div key={idx} className="flex items-center gap-3">
-              <span className="text-sm text-zinc-400 w-4">{idx + 1}</span>
-              <div className="flex gap-1">
-                {a.jamo.map((j, i) => (
-                  <JamoTile key={i} char={j} value={a.pattern[i]} />
-                ))}
-              </div>
-              <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                {a.word}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {status === "playing" && (
-        <div className="flex flex-col items-center gap-4">
-          <div className="text-center">
-            <p className="text-sm text-zinc-600 dark:text-zinc-300 mb-1">
-              시도 {attemptNum}/6 · 남은 후보 {remaining.toLocaleString()}개
-            </p>
-            <p className="text-4xl font-bold text-zinc-900 dark:text-white tracking-wide">
-              {suggestion.word}
-            </p>
-          </div>
-
-          <div className="flex gap-2">
-            {suggestion.jamo.map((j, i) => (
-              <JamoTile
-                key={i}
-                char={j}
-                value={pattern[i]}
-                selected={i === selectedIndex}
-                onClick={() => {
-                  setSelectedIndex(i);
-                  cyclePattern(i);
-                }}
-              />
+      {!length ? (
+        <div className="flex flex-col items-center gap-4 mt-8">
+          <p className="text-lg text-zinc-700 dark:text-zinc-300">
+            자소 길이를 선택하세요
+          </p>
+          <div className="flex gap-3 flex-wrap justify-center">
+            {(lengthCounts ?? []).map(([len, cnt]) => (
+              <button
+                key={len}
+                onClick={() => selectLength(len)}
+                className="px-6 py-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-semibold rounded-lg transition-colors"
+              >
+                {len}자소 ({cnt.toLocaleString()}개)
+              </button>
             ))}
           </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              onClick={() => setState(resetState())}
+              className="text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 underline"
+            >
+              길이 변경
+            </button>
+            <span className="text-xs text-zinc-400">
+              {length}자소 · {TOTAL_WORDS.toLocaleString()}개 단어
+            </span>
+          </div>
 
-          <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            클릭하거나 좌우 방향키로 이동 후 Space를 눌러 상태를 변경하세요
-          </p>
-
-          {error && <p className="text-sm text-red-500">{error}</p>}
-
-          <button
-            onClick={handleSubmit}
-            disabled={loading || !allWords}
-            className="mt-1 px-8 py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold rounded-full disabled:opacity-50 hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors"
-          >
-            {loading
-              ? "계산 중..."
-              : !allWords
-                ? "로딩 중..."
-                : "결과 제출 (Enter)"}
-          </button>
-
-          {candidates && (
-            <div className="mt-2 text-center">
-              <p className="text-xs text-zinc-400 mb-1">남은 후보</p>
-              <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                {candidates.join(", ")}
-              </p>
+          {attempts.length > 0 && (
+            <div className="flex flex-col gap-2 mb-6">
+              {attempts.map((a, idx) => (
+                <div key={idx} className="flex items-center gap-3">
+                  <span className="text-sm text-zinc-400 w-4">{idx + 1}</span>
+                  <div className="flex gap-1">
+                    {a.jamo.map((j, i) => (
+                      <JamoTile key={i} char={j} value={a.pattern[i]} />
+                    ))}
+                  </div>
+                  <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                    {a.word}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
-        </div>
-      )}
 
-      {status === "won" && (
-        <div className="flex flex-col items-center gap-4">
-          <p className="text-3xl font-bold text-emerald-500">정답!</p>
-          <p className="text-zinc-500 dark:text-zinc-400">
-            {attempts.length}번만에 성공했습니다
-          </p>
-          <button
-            onClick={() => setState(resetState())}
-            className="px-6 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold rounded-full hover:bg-zinc-700 transition-colors"
-          >
-            다시 시작 (Enter)
-          </button>
-        </div>
-      )}
+          {status === "playing" && (
+            <div className="flex flex-col items-center gap-4">
+              <div className="text-center">
+                <p className="text-sm text-zinc-600 dark:text-zinc-300 mb-1">
+                  시도 {attemptNum}/6 · 남은 후보 {remaining.toLocaleString()}개
+                </p>
+                <p className="text-4xl font-bold text-zinc-900 dark:text-white tracking-wide">
+                  {suggestion.word}
+                </p>
+              </div>
 
-      {status === "lost" && (
-        <div className="flex flex-col items-center gap-4">
-          <p className="text-3xl font-bold text-red-500">실패</p>
-          <p className="text-zinc-500 dark:text-zinc-400">
-            6번 안에 맞추지 못했습니다
-          </p>
-          <button
-            onClick={() => setState(resetState())}
-            className="px-6 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold rounded-full hover:bg-zinc-700 transition-colors"
-          >
-            다시 시작
-          </button>
-        </div>
+              <div className="flex gap-2">
+                {suggestion.jamo.map((j, i) => (
+                  <JamoTile
+                    key={i}
+                    char={j}
+                    value={pattern[i]}
+                    selected={i === selectedIndex}
+                    onClick={() => {
+                      setSelectedIndex(i);
+                      cyclePattern(i);
+                    }}
+                  />
+                ))}
+              </div>
+
+              <p className="text-sm text-zinc-600 dark:text-zinc-300">
+                클릭하거나 좌우 방향키로 이동 후 Space를 눌러 상태를 변경하세요
+              </p>
+
+              {error && <p className="text-sm text-red-500">{error}</p>}
+
+              <button
+                onClick={handleSubmit}
+                disabled={loading || !allWords}
+                className="mt-1 px-8 py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold rounded-full disabled:opacity-50 hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors"
+              >
+                {loading
+                  ? "계산 중..."
+                  : !allWords
+                    ? "로딩 중..."
+                    : "결과 제출 (Enter)"}
+              </button>
+
+              {candidates && (
+                <div className="mt-2 text-center">
+                  <p className="text-xs text-zinc-400 mb-1">남은 후보</p>
+                  <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {candidates.join(", ")}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {status === "won" && (
+            <div className="flex flex-col items-center gap-4">
+              <p className="text-3xl font-bold text-emerald-500">정답!</p>
+              <p className="text-zinc-500 dark:text-zinc-400">
+                {attempts.length}번만에 성공했습니다
+              </p>
+              <button
+                onClick={() => setState(resetState())}
+                className="px-6 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold rounded-full hover:bg-zinc-700 transition-colors"
+              >
+                다시 시작 (Enter)
+              </button>
+            </div>
+          )}
+
+          {status === "lost" && (
+            <div className="flex flex-col items-center gap-4">
+              <p className="text-3xl font-bold text-red-500">실패</p>
+              <p className="text-zinc-500 dark:text-zinc-400">
+                6번 안에 맞추지 못했습니다
+              </p>
+              <button
+                onClick={() => setState(resetState())}
+                className="px-6 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold rounded-full hover:bg-zinc-700 transition-colors"
+              >
+                다시 시작
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

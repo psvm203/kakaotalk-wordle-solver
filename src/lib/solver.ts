@@ -18,19 +18,20 @@ export async function loadWords(): Promise<WordEntry[]> {
 }
 
 export function getPattern(guess: Jamo, answer: Jamo): Pattern {
-  const pattern: number[] = [0, 0, 0, 0, 0];
+  const n = guess.length;
+  const pattern: number[] = Array(n).fill(0);
   const remaining: (string | null)[] = [...answer];
 
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < n; i++) {
     if (guess[i] === answer[i]) {
       pattern[i] = 2;
       remaining[i] = null;
     }
   }
 
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < n; i++) {
     if (pattern[i] === 2) continue;
-    for (let j = 0; j < 5; j++) {
+    for (let j = 0; j < n; j++) {
       if (remaining[j] !== null && remaining[j] === guess[i]) {
         pattern[i] = 1;
         remaining[j] = null;
